@@ -6,9 +6,10 @@
 		<div>
 			<FormControl
 				type="text"
-				placeholder="Search Participants"
+				placeholder="Search"
 				v-model="searchQuery"
 				@input="participants.reload()"
+				class="w-40"
 			>
 				<template #prefix>
 					<Search class="w-4 stroke-1.5 text-gray-600" name="search" />
@@ -18,7 +19,10 @@
 	</header>
 
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 m-5">
-		<div v-if="participants.data" v-for="participant in participants.data">
+		<div
+			v-if="participants.data?.length"
+			v-for="participant in participantsList"
+		>
 			<router-link
 				:to="{
 					name: 'Profile',
@@ -59,12 +63,7 @@ const searchQuery = ref('')
 const participants = createResource({
 	url: 'lms.lms.api.get_certified_participants',
 	method: 'GET',
-	debounce: 300,
-	makeParams(values) {
-		return {
-			search_query: searchQuery.value,
-		}
-	},
+	cache: 'certified-participants',
 	auto: true,
 })
 
@@ -77,6 +76,17 @@ const pageMeta = computed(() => {
 		title: 'Certified Participants',
 		description: 'All participants that have been certified.',
 	}
+})
+
+const participantsList = computed(() => {
+	if (searchQuery.value) {
+		return participants.data.filter((participant) => {
+			return participant.full_name
+				.toLowerCase()
+				.includes(searchQuery.value.toLowerCase())
+		})
+	}
+	return participants.data
 })
 
 updateDocumentTitle(pageMeta)

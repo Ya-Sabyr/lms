@@ -5,7 +5,7 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cstr, comma_and
+from frappe.utils import cstr, comma_and, cint
 from fuzzywuzzy import fuzz
 from lms.lms.doctype.course_lesson.course_lesson import save_progress
 from lms.lms.utils import (
@@ -30,12 +30,12 @@ class LMSQuiz(Document):
 			)
 
 	def validate_limit(self):
-		if self.limit_questions_to and self.limit_questions_to >= len(self.questions):
+		if self.limit_questions_to and cint(self.limit_questions_to) >= len(self.questions):
 			frappe.throw(
 				_("Limit cannot be greater than or equal to the number of questions in the quiz.")
 			)
 
-		if self.limit_questions_to and self.limit_questions_to < len(self.questions):
+		if self.limit_questions_to and cint(self.limit_questions_to) < len(self.questions):
 			marks = [question.marks for question in self.questions]
 			if len(set(marks)) > 1:
 				frappe.throw(_("All questions should have the same marks if the limit is set."))
@@ -43,10 +43,10 @@ class LMSQuiz(Document):
 	def calculate_total_marks(self):
 		if self.limit_questions_to:
 			self.total_marks = sum(
-				question.marks for question in self.questions[: self.limit_questions_to]
+				question.marks for question in self.questions[: cint(self.limit_questions_to)]
 			)
 		else:
-			self.total_marks = sum(question.marks for question in self.questions)
+			self.total_marks = sum(cint(question.marks) for question in self.questions)
 
 	def autoname(self):
 		if not self.name:
@@ -90,21 +90,19 @@ def quiz_summary(quiz, results):
 
 		question_details = frappe.db.get_value(
 			"LMS Quiz Question",
-			{"parent": quiz, "idx": result["question_index"]},
-			["question", "marks"],
+			{"parent": quiz, "question": result["question_name"]},
+			["question", "marks", "question_detail"],
 			as_dict=1,
 		)
 
 		result["question_name"] = question_details.question
-		result["question"] = frappe.db.get_value(
-			"LMS Question", question_details.question, "question"
-		)
+		result["question"] = question_details.question_detail
 		marks = question_details.marks if correct else 0
 
 		result["marks"] = marks
 		score += marks
 
-		del result["question_index"]
+		del result["question_name"]
 
 	quiz_details = frappe.db.get_value(
 		"LMS Quiz", quiz, ["total_marks", "passing_percentage", "lesson", "course"], as_dict=1
@@ -297,15 +295,6 @@ def check_choice_answers(question, answers):
 
 	question_details = frappe.db.get_value("LMS Question", question, fields, as_dict=1)
 
-	""" if question_details.multiple:
-		correct_answers = [ question_details[f"option_{num}"] for num in range(1,5) if question_details[f"is_correct_{num}"]]
-		print(answers)
-		for ans in correct_answers:
-			if ans not in answers:
-				is_correct.append(0)
-			else:
-				is_correct.append(1)
-	else: """
 	for num in range(1, 5):
 		if question_details[f"option_{num}"] in answers:
 			is_correct.append(question_details[f"is_correct_{num}"])

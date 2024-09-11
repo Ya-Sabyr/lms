@@ -6,6 +6,7 @@ from frappe.translate import get_all_translations
 from frappe import _
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count
+from frappe.utils import time_diff, now_datetime, get_datetime
 
 
 @frappe.whitelist()
@@ -265,7 +266,9 @@ def get_chart_details():
 			"upcoming": 0,
 		},
 	)
-	details.users = frappe.db.count("User", {"enabled": 1})
+	details.users = frappe.db.count(
+		"User", {"enabled": 1, "name": ["not in", ("Administrator", "Guest")]}
+	)
 	details.completions = frappe.db.count(
 		"LMS Enrollment", {"progress": ["like", "%100%"]}
 	)
@@ -330,13 +333,12 @@ def get_evaluator_details(evaluator):
 
 
 @frappe.whitelist(allow_guest=True)
-def get_certified_participants(search_query=""):
+def get_certified_participants():
 	LMSCertificate = DocType("LMS Certificate")
 	participants = (
 		frappe.qb.from_(LMSCertificate)
 		.select(LMSCertificate.member)
 		.distinct()
-		.where(LMSCertificate.member_name.like(f"%{search_query}%"))
 		.where(LMSCertificate.published == 1)
 		.orderby(LMSCertificate.creation, order=frappe.qb.desc)
 		.run(as_dict=1)
@@ -542,3 +544,69 @@ def update_index(lessons, chapter):
 		frappe.db.set_value(
 			"Lesson Reference", {"lesson": row, "parent": chapter}, "idx", lessons.index(row) + 1
 		)
+
+
+@frappe.whitelist(allow_guest=True)
+def get_categories(doctype, filters):
+	categoryOptions = []
+
+	categories = frappe.get_all(
+		doctype,
+		filters,
+		pluck="category",
+	)
+	categories = list(set(categories))
+
+	for category in categories:
+		if category:
+			categoryOptions.append({"label": category, "value": category})
+
+	return categoryOptions
+
+
+@frappe.whitelist()
+def get_members(start=0, search=""):
+	"""Get members for the given search term and start index.
+	Args: start (int): Start index for the query.
+	    search (str): Search term to filter the results.
+	Returns: List of members.
+	"""
+
+	filters = {"enabled": 1, "name": ["not in", ["Administrator", "Guest"]]}
+
+	if search:
+		filters["full_name"] = ["like", f"%{search}%"]
+
+	members = frappe.get_all(
+		"User",
+		filters=filters,
+		fields=["name", "full_name", "user_image", "username", "last_active"],
+		page_length=20,
+		start=start,
+	)
+
+	for member in members:
+		roles = frappe.get_roles(member.name)
+		if "Moderator" in roles:
+			member.role = "Moderator"
+		elif "Course Creator" in roles:
+			member.role = "Course Creator"
+		elif "Batch Evaluator" in roles:
+			member.role = "Batch Evaluator"
+		elif "LMS Student" in roles:
+			member.role = "LMS Student"
+
+	return members
+
+
+def check_app_permission():
+	"""Check if the user has permission to access the app."""
+	if frappe.session.user == "Administrator":
+		return True
+
+	roles = frappe.get_roles()
+	lms_roles = ["Moderator", "Course Creator", "Batch Evaluator", "LMS Student"]
+	if any(role in roles for role in lms_roles):
+		return True
+
+	return False

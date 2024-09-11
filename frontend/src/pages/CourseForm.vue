@@ -119,7 +119,7 @@
 						<div class="text-lg font-semibold mt-5 mb-4">
 							{{ __('Settings') }}
 						</div>
-						<div class="grid grid-cols-2 gap-10 mb-4">
+						<div class="grid grid-cols-3 gap-10 mb-4">
 							<div
 								v-if="user.data?.is_moderator"
 								class="flex flex-col space-y-3"
@@ -147,10 +147,17 @@
 									v-model="course.featured"
 									:label="__('Featured')"
 								/>
+							</div>
+							<div class="flex flex-col space-y-3">
 								<FormControl
 									type="checkbox"
 									v-model="course.disable_self_learning"
 									:label="__('Disable Self Enrollment')"
+								/>
+								<FormControl
+									type="checkbox"
+									v-model="course.enable_certification"
+									:label="__('Completion Certificate')"
 								/>
 							</div>
 						</div>
@@ -220,6 +227,7 @@ import { FileText, X } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import CourseOutline from '@/components/CourseOutline.vue'
 import MultiSelect from '@/components/Controls/MultiSelect.vue'
+import { capture } from '@/telemetry'
 
 const user = inject('$user')
 const newTag = ref('')
@@ -244,6 +252,7 @@ const course = reactive({
 	featured: false,
 	upcoming: false,
 	disable_self_learning: false,
+	enable_certification: false,
 	paid_course: false,
 	course_price: '',
 	currency: '',
@@ -260,6 +269,8 @@ onMounted(() => {
 
 	if (props.courseName !== 'new') {
 		courseResource.reload()
+	} else {
+		capture('course_form_opened')
 	}
 	window.addEventListener('keydown', keyboardShortcut)
 })
@@ -337,6 +348,7 @@ const courseResource = createResource({
 			'disable_self_learning',
 			'paid_course',
 			'featured',
+			'enable_certification',
 		]
 		for (let idx in checkboxes) {
 			let key = checkboxes[idx]
@@ -379,9 +391,10 @@ const submitCourse = () => {
 	} else {
 		courseCreationResource.submit(course, {
 			onSuccess(data) {
+				capture('course_created')
 				showToast('Success', 'Course created successfully', 'check')
 				router.push({
-					name: 'CreateCourse',
+					name: 'CourseForm',
 					params: { courseName: data.name },
 				})
 			},
@@ -480,7 +493,7 @@ const breadcrumbs = computed(() => {
 	}
 	crumbs.push({
 		label: props.courseName == 'new' ? 'New Course' : 'Edit Course',
-		route: { name: 'CreateCourse', params: { courseName: props.courseName } },
+		route: { name: 'CourseForm', params: { courseName: props.courseName } },
 	})
 	return crumbs
 })

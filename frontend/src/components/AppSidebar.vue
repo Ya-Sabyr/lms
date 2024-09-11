@@ -7,7 +7,7 @@
 			class="flex flex-col overflow-hidden"
 			:class="isSidebarCollapsed ? 'items-center' : ''"
 		>
-			<UserDropdown class="p-2" :isCollapsed="isSidebarCollapsed" />
+			<UserDropdown :isCollapsed="isSidebarCollapsed" />
 			<div class="flex flex-col" v-if="sidebarSettings.data">
 				<SidebarLink
 					v-for="link in sidebarLinks"
@@ -18,7 +18,7 @@
 			</div>
 			<div
 				v-if="sidebarSettings.data?.web_pages?.length || isModerator"
-				class="pt-1"
+				class="mt-4"
 			>
 				<div
 					class="flex items-center justify-between pr-2 cursor-pointer"
@@ -27,7 +27,7 @@
 				>
 					<div
 						v-if="!isSidebarCollapsed"
-						class="flex items-center text-sm font-medium text-gray-600"
+						class="flex items-center text-sm text-gray-600 my-1"
 					>
 						<span class="grid h-5 w-6 flex-shrink-0 place-items-center">
 							<ChevronRight
@@ -36,7 +36,7 @@
 							/>
 						</span>
 						<span class="ml-2">
-							{{ __('Web Pages') }}
+							{{ __('More') }}
 						</span>
 					</div>
 					<Button v-if="isModerator" variant="ghost" @click="openPageModal()">
@@ -100,7 +100,7 @@ import { ChevronRight, Plus } from 'lucide-vue-next'
 import { createResource, Button } from 'frappe-ui'
 import PageModal from '@/components/Modals/PageModal.vue'
 
-const { user } = sessionStore()
+const { user, sidebarSettings } = sessionStore()
 const { userResource } = usersStore()
 const socket = inject('$socket')
 const unreadCount = ref(0)
@@ -115,6 +115,20 @@ onMounted(() => {
 		unreadNotifications.reload()
 	})
 	addNotifications()
+	sidebarSettings.reload(
+		{},
+		{
+			onSuccess(data) {
+				Object.keys(data).forEach((key) => {
+					if (!parseInt(data[key])) {
+						sidebarLinks.value = sidebarLinks.value.filter(
+							(link) => link.label.toLowerCase().split(' ').join('_') !== key
+						)
+					}
+				})
+			},
+		}
+	)
 })
 
 const unreadNotifications = createResource({
@@ -152,21 +166,6 @@ const addNotifications = () => {
 		})
 	}
 }
-
-const sidebarSettings = createResource({
-	url: 'lms.lms.api.get_sidebar_settings',
-	cache: 'Sidebar Settings',
-	auto: true,
-	onSuccess(data) {
-		Object.keys(data).forEach((key) => {
-			if (!parseInt(data[key])) {
-				sidebarLinks.value = sidebarLinks.value.filter(
-					(link) => link.label.toLowerCase().split(' ').join('_') !== key
-				)
-			}
-		})
-	},
-})
 
 const openPageModal = (link) => {
 	showPageModal.value = true

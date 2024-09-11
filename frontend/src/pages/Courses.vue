@@ -5,22 +5,24 @@
 		>
 			<Breadcrumbs
 				class="h-7"
-				:items="[{ label: __('All Courses'), route: { name: 'Courses' } }]"
+				:items="[{ label: __('Courses'), route: { name: 'Courses' } }]"
 			/>
-			<div class="flex space-x-2">
-				<FormControl
-					type="text"
-					placeholder="Search Course"
-					v-model="searchQuery"
-					@input="courses.reload()"
-				>
-					<template #prefix>
-						<Search class="w-4 stroke-1.5 text-gray-600" name="search" />
-					</template>
-				</FormControl>
+			<div class="flex space-x-2 justify-end">
+				<div class="w-36">
+					<FormControl
+						type="text"
+						placeholder="Search"
+						v-model="searchQuery"
+						@input="courses.reload()"
+					>
+						<template #prefix>
+							<Search class="w-4 h-4 stroke-1.5 text-gray-600" name="search" />
+						</template>
+					</FormControl>
+				</div>
 				<router-link
 					:to="{
-						name: 'CreateCourse',
+						name: 'CourseForm',
 						params: {
 							courseName: 'new',
 						},
@@ -134,29 +136,30 @@ let tabs
 
 const makeTabs = computed(() => {
 	tabs = []
-	addToTabs('Live', getCourses('live'))
-	addToTabs('New', getCourses('new'))
-	addToTabs('Upcoming', getCourses('upcoming'))
+	addToTabs('Live')
+	addToTabs('New')
+	addToTabs('Upcoming')
 
 	if (user.data) {
-		addToTabs('Enrolled', getCourses('enrolled'))
+		addToTabs('Enrolled')
 
 		if (
 			user.data.is_moderator ||
 			user.data.is_instructor ||
 			courses.data?.created?.length
 		) {
-			addToTabs('Created', getCourses('created'))
+			addToTabs('Created')
 		}
 
 		if (user.data.is_moderator) {
-			addToTabs('Under Review', getCourses('under_review'))
+			addToTabs('Under Review')
 		}
 	}
 	return tabs
 })
 
-const addToTabs = (label, courses) => {
+const addToTabs = (label) => {
+	let courses = getCourses(label.toLowerCase().split(' ').join('_'))
 	tabs.push({
 		label,
 		courses: computed(() => courses),
@@ -166,8 +169,12 @@ const addToTabs = (label, courses) => {
 
 const getCourses = (type) => {
 	if (searchQuery.value) {
-		return courses.data[type].filter((course) =>
-			course.title.toLowerCase().includes(searchQuery.value.toLowerCase())
+		let query = searchQuery.value.toLowerCase()
+		return courses.data[type].filter(
+			(course) =>
+				course.title.toLowerCase().includes(query) ||
+				course.short_introduction.toLowerCase().includes(query) ||
+				course.tags.filter((tag) => tag.toLowerCase().includes(query)).length
 		)
 	}
 	return courses.data[type]
